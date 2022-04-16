@@ -1,0 +1,2433 @@
+---
+title: "Tweet Attribution with Temporal Predictors"
+subtitle: "Philippe Lambot -- April 17, 2022"
+
+output: 
+  html_document:
+    toc: true               # TOC (table of contents) required
+    toc_depth: 2            # Depth of headers in TOC
+    number_sections: true   # Adding section numbering to headers.
+    css: styles.css         # Calling CSS file.
+    toc_float:              # Floats TOC to left of the main doc.
+      collapsed: false      # Floating TOC with 2 levels.
+      smooth_scroll: true   # Controls scrolls related to TOC navigation.
+    code_folding: hide      # Includes R code but has it hidden by default.
+    highlight: espresso     # Specifies code highlighting style.
+    theme: readable         # HTML document theme 
+                            # (essentially superseded by CSS file)
+    df_print: paged         # HTML tables with support for pagination
+    smart: false            # Avoids typographical correction.
+
+# styles.css is a CSS file that regulates many layout aspects. 
+# It is lodged in the same GitHub repository as 
+# Tweet_Attribution_Temporal_Predictors.Rmd, i.e. in 
+# https://github.com/Dev-P-L/Tweet_Attribution_Temporal_Predictors .
+
+# If you wish to run the file 
+# Tweet_Attribution_Temporal_Predictors.Rmd on your computer, 
+# I suggest placing the file
+# Tweet_Attribution_Temporal_Predictors.Rmd and styles.css 
+# in the same folder.
+
+---
+
+```{r Initial arrangement about RAM management and code verbosity and layout  in addition to the rules already contained in the CSS file referred to and called above}
+
+# CLEARING UP WORKSPACE FOR RAM MANAGEMENT.
+
+# 1. Clearing plots
+invisible(if(!is.null(dev.list())) dev.off())
+
+# 2. Cleaning workspace
+rm(list=ls())
+
+# 3. Cleaning console
+cat("\014")
+
+# AVOIDING MESSAGES AND WARNINGS.
+
+# We want to avoid messages and warnings in 
+# Tweet_Attribution_Temporal_Predictors.html . 
+# Anyway, messages and warnings produced by the code 
+# on my computer have already been dealt with.
+
+knitr::opts_chunk$set(echo = TRUE, 
+                      message = FALSE, 
+                      warning = FALSE)
+
+# The next opts_chunk fully deploys figures and centers them.
+knitr::opts_chunk$set(out.width = "100%", 
+                      fig.align = "center")
+
+# The next instruction facilitates table layout in HTML.
+options(knitr.table.format = "html")
+
+# The string <br> is used to generate empty lines.
+ 
+```
+
+<br>
+
+# Executive Summary
+
+**An accuracy level of ... %** has been reached in attributing tweets with temporal predictors. 
+
+Tweets come from the account of Candidate Donald Trump during the 2016 presidential election campaign. Two devices have been used to issue tweets: an Android device and an iPhone. The challenge has been to predict the device on the validation set. 
+
+Temporal predictors have been identified through **Exploratory Data Analysis**.
+
+Tweet attribution has been operated through Machine Learning with one algorithm: eXtreme Gradient Boosting. Several models have been tried and their performances have been evaluated thanks to bootstrapped resampling. The performance metric has been accuracy because the proportion of tweets sent by each device is close to 50 %, which means that a baseline model would have an curacy performance hardly larger than 50 %.
+
+This project is merely technical; it expresses absolutely no political vision or standpoint; it is in no way person-related; the author's methods, insights, results, and conclusions are only the ones explicitly expressed in this project itself, which only encompasses files lodged with the GitHub repository: https://github.com/Dev-P-L/Tweet_Attribution_Temporal_Predictors .
+
+Tweet atribution had already been performed on the same dataset. Predictors were stylometric ones, mainly punctuation marks, symbols, special sequences of characters, abbreviations, entities – URLs, mentions, and hashtags –, and emojis.
+
+Prediction accuracy had reached 92% after long drilling down into textual data and developing detailed exploratory analysis. 
+
+The final objective is to perform tweet attribution on the same dataset with different types of predictors. This is the second step. 
+
+When all types of predictors have been tried separately, then a global model will be built up.
+
+<br>
+
+TAGS: tweet attribution, temporal predictors, machine learning, eXtreme Gradient Boosting, bootstrapped resampling
+
+<br>
+
+GITHUB: https://github.com/Dev-P-L/Tweet_Attribution_Temporal_Predictors
+
+<br>
+
+# Requirements
+
+This project is based on the dataset *trump_tweets* from the R package *dslabs*. This means that usage of this project must strictly comply with all requirements imposed by *dslabs* and by all *dslabs* sources. 
+
+<br>
+
+# Welcoming Readers
+
+Dear Readers,
+
+For your convenience, the final document Tweet_Attribution_Stylometry.html is an HTML document with interactive layout: the table of contents, the wordclouds, the graphs, and many tables are interactive; moreover, code can be visualized by pushing tag buttons on the right-hand-side of the HTML document. 
+
+Furthermore, for everyone's convenience, I have tried using, when possible, colors that are clearly distinguishable to take into account alternative color perception, following pieces of advice given in [Cookbook R](http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/). As far as code visualization is concerned — when pushing tag buttons on the right-hand-side of the HTML document —, I hope the theme *espresso*, which I have chosen, is satisfactory. 
+
+```{r Arrangement about colors}
+
+# With a view to providing visual comfort to everybody, most 
+# colors have been picked up from cbPalette and cbbPalette
+# from http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/ .
+
+# Colors assigned to the Android device. 
+bluish_green <- "#009e73"
+
+# Colors assigned to the iPhone.
+gray_palette <- "#999999"
+
+# Bicolored palette to distinguish the two devices.
+duo_Palette_bluishgreen_gray <- c("#009e73", "#999999")
+
+# Other colors from cbPalette and cbbPalette
+deep_blue <- "#0072b2"
+sky_blue <- "#56b4e9"
+yellow <- "#f0e442"
+
+# Other colors outside of cbPalette and cbbPalette
+white <- "#ffffff"
+
+# Bicolored palette to distinguish AM from PM.
+duo_Palette_white_yellow <- c(white, yellow)
+
+# The variable gray is assigned the string "gray"
+# so that the variable gray can be used without
+# quotation marks, just as other color variables above,
+# at least in R if not in JavaScript. 
+gray <- "gray"
+
+# The following customized bicolored palette is used 
+# to distinguish AM from PM. Color distinctiveness 
+# has been tested for alternative color perception types 
+# with Windows 11 Settings / Accessibility / Color filters.
+duo_Palette_crimson_rosequartz <- c("#a41034", "#aa98a9")
+
+```
+
+You are most welcome to knit the file Tweet_Attribution_Temporal_Predictors.Rmd to produce the document Tweet_Attribution_Temporal_Predictors.html . For the record, some characteristics of my work environment are visible in the last section of this document, titled *R Session Info*. 
+
+<br>
+
+# R Packages & Data
+
+## R Packages
+
+If necessary, numerous R packages are downloaded by the code chunk below:
+
+* packages from the *tidyverse* or associated with it;
+* packages associated with R Markdown;
+* packages related to interactive graphs, and tables;
+* packages for Machine Learning.
+
+```{r Downloading packages}
+
+# PACKAGE CONTAINING THE DATASET.
+
+if(!require(dslabs)) install.packages("dslabs", repos = "http://cran.us.r-project.org")
+
+# PACKAGES ASSOCIATED WITH TIDYVERSE.
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(scales)) install.packages("scales", repos = "http://cran.us.r-project.org")
+if(!require(lubridate)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
+if(!require(ggthemes)) install.packages("ggthemes", repos = "http://cran.us.r-project.org")
+
+# PACKAGES ASSOCIATED WITH R MARKDOWN.
+
+if(!require(knitr)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+if(!require(kableExtra)) install.packages("kableExtra", repos = "http://cran.us.r-project.org")
+if(!require(gridExtra)) install.packages("gridExtra", repos = "http://cran.us.r-project.org")
+
+# PACKAGES ASSOCIATED WITH INTERACTIVE TABLES AND GRAPHS.
+
+if(!require(devtools)) install.packages("devtools", repos = "http://cran.us.r-project.org")
+if(!require(htmltools)) install.packages("htmltools", repos = "http://cran.us.r-project.org")
+if(!require(shiny)) install.packages("shiny", repos = "http://cran.us.r-project.org")
+if(!require(httpuv)) install.packages("httpuv", repos = "http://cran.us.r-project.org")
+if(!require(xtable)) install.packages("xtable", repos = "http://cran.us.r-project.org")
+if(!require(sourcetools)) install.packages("sourcetools", repos = "http://cran.us.r-project.org")
+if(!require(fastmap)) install.packages("fastmap", repos = "http://cran.us.r-project.org")
+if(!require(DT)) install.packages("DT", repos = "http://cran.us.r-project.org")
+if(!require(plotly)) install.packages("plotly", repos = "http://cran.us.r-project.org")
+
+# PACKAGES FOR MACHINE LEARNING
+
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(xgboost)) install.packages("xgboost", repos = "http://cran.us.r-project.org")
+
+# REQUIRING LIBRARIES.
+
+library(tidyverse)
+library(scales)
+library(lubridate)
+library(ggthemes)
+library(knitr)
+library(kableExtra)
+library(gridExtra)
+library(devtools)
+library(htmltools)
+library(shiny)
+library(httpuv)
+library(xtable)
+library(sourcetools)
+library(fastmap)
+library(DT)
+library(plotly)
+library(caret)
+library(xgboost)
+
+# FROM GITHUB
+
+# Basic
+if(!require(githubinstall)) install.packages("githubinstall", repos = "http://cran.us.r-project.org")
+library(githubinstall)
+
+# Repair Tool
+
+# Prevents the function wordcloud2() from silently failing 
+# after the first wordcloud. For explanation, please see 
+# https://github.com/Lchiffon/wordcloud2/issues/65 .
+
+devtools::install_github("gaospecial/wordcloud2")
+library(wordcloud2)
+
+```
+
+## Data
+
+Data have been downloaded from the dataset *trump_tweets* from the R package *dslabs* when developing the *Tweet_Attribution_Temporal_Predictors* project, which has been posted on the https://github.com/Dev-P-L/Tweet_Attribution_Temporal_Predictors repository.  
+
+Documentation is available at ?trump_tweets in an R session.
+
+Tweets — and the other features — have been squeezed to tweets sent by tow devices — the Android device and the iPhone — during the period of the 2016 US presidential campaign, that is to say between the day the Candidate Donald Trump announced his campaign until election day. 
+
+In that project, data have already been split into a training set and a validation set. These will be used in this project as well.
+
+Readers interested in a presentation of the whole dataset or of the training set could refer to the *Tweet_Attribution_Temporal_Predictors* project, especially to the final HTML document at https://dev-p-l.github.io/Tweet_Attribution_Stylometry/Tweet_Attribution_Stylometry.html .
+
+In the training set, there are eight features. 
+
+In the current project, only three features are necessary: the tweet identifier, the timestamp, and the device identification. The other features will immediately be discarded from the training set to produce a simplified training set, which will be used in this project about tweet attribution with temporal predictors. 
+
+```{r Downloading data, class.output = "bg-primary"}
+
+# Downloading dataset and keeping only 3 features. 
+train <- read_csv(
+  "https://raw.githubusercontent.com/Dev-P-L/Tweet_Attribution_Stylometry/master/train_tweets.csv") %>%
+  as.data.frame() %>%
+  select(id_str, created_at, device) 
+
+# Prints data frame description with bg-primary layout
+# as requested in the chunk header.
+str(train, vec.len = 1)
+
+```
+
+<br>
+
+## Data Profiling
+
+The table above shows, among others, that the total number of rows is 2,633. This suffices, in principle, to apply Machine Learning algorithms. 
+
+Among the features, **id_str** is the tweet identifier. 
+
+The variable **device** indicates the device that was used to compose and upload each tweet. It is the dependent variable or label or target variable: tweet attribution will be attribution of tweets either to the Android device or to the iPhone. Here is the breakdown of tweets by device.
+
+```{r Breakdown of tweets by device}
+
+# Table with breakdown of tweets by device
+tab <- data.frame(train$device) %>%
+  group_by(train$device) %>% 
+  summarize(n = n(), 
+            perc = n * 100 / length(train$device)) %>%
+  mutate(n = format(n, big.mark = " ")) %>%
+  mutate(perc = paste(round(perc, 0), "%", sep = " ")) 
+
+# The next part from this code chunk constructs and prints 
+# a table with a customizable header. 
+
+# First, column names from tab are removed.
+names(tab) <- NULL
+
+# A new vector of column names is created. 
+name <- c("Device", 
+          "Number of Tweets by Device",
+          "Percentage of Tweets by Device")
+
+# The next line of code assembles tab and the vector of column names, 
+# which becomes the first row and appears as the new header, which is 
+# largely customizable.
+
+tab <- rbind(name, tab) 
+rm(name)
+
+# Prints the table.
+knitr::kable(tab, "html", align = "c") %>% 
+  kable_styling(full_width = T, font_size = 16) %>%
+  row_spec(1, bold = TRUE, 
+           color = white, background = deep_blue) %>%
+  row_spec(2, color = white, background = bluish_green) %>%
+  row_spec(3, color = white, background = gray_palette) 
+
+```
+
+<br>
+
+As shown in the table above, tweets by the iPhone are somewhat more numerous but the difference in percentage points is limited.
+
+A baseline model would predict device by attributing to all observations the class with the most occurrences, that is to say the iPhone. This would deliver very low prediction accuracy, or more precisely 53 % accuracy, which is the proportion of iPhone tweets. 
+
+Consequently, accuracy appears to be a rather satisfactory performance metric. It will be the performance metric in this project. 
+
+<br>
+
+# Data Wrangling
+
+The variable **created_at** contains the date and time at which the tweet was tweeted. This variable can be per se a predictor. 
+
+Furthermore, Data wrangling will be conducted on the variable **created_at** to decompose this variable into temporal components such as monday, hour, etc. This can deliver several other potential predictors. 
+
+Later on, Exploratory Data Analysis (EDA) will be performed, exploring whether various potential predictors could seem promising ones.
+
+For each tweet, we will extract from *created_at* 
+
+- the month,
+- the week, 
+- the weekday,
+- the hour in the 24-hour clock, in the East Coast time zone (EST),
+- a decimal presentation of hour, 
+- the day section (am or pm).
+
+In the decimal hour presentation, hours are expressed as in the 24-hour clock in the East Coast time zone (EST) but minutes and seconds are added as a decimal part in the decimal system. 
+
+```{r Extracting date and time components}
+
+# The function Sys.setlocale() ensures that month names 
+# are in English in the graph below. 
+# The function capture.output() encapsulates the output,
+# which is then disposed of, so as to avoid any message
+# in the HTML document. 
+
+dustbin <- capture.output(Sys.setlocale("LC_TIME", "English"))
+rm(dustbin)
+
+train <- train %>%
+  mutate(year = year(created_at)) %>%
+  mutate(month = floor_date(with_tz(created_at, "EST"), 
+                            unit = "month")) %>%
+  mutate(month_name = month(created_at, label = T, abbr = T)) %>%
+  mutate(week = floor_date(with_tz(created_at, "EST"), 
+                           unit = "week")) %>%
+  mutate(day = floor_date(with_tz(created_at, "EST"), 
+                          unit = "day")) %>%
+  mutate(weekday = weekdays(with_tz(created_at, "EST"), 
+                            abbreviate = TRUE)) %>%
+  mutate(hour = hour(with_tz(created_at, "EST"))) %>%
+  mutate(minute = minute(with_tz(created_at, "EST"))) %>%
+  mutate(second = second(with_tz(created_at, "EST"))) %>%
+  mutate(decimal_hour = hour + (minute / 60) + (second / 3600)) %>%
+  mutate(am_pm = ifelse(hour >= 12, "PM", "AM")) %>%
+  arrange(created_at) %>%
+  select(- minute, - second) %>%
+  select(device, everything()) 
+
+```
+
+<br>
+
+## Timing of All Tweets
+
+```{r Time graph of all tweets with distinction per device}
+
+# Reverses hour order to have zero at the bottom of the y axis.
+df <- train %>%
+  mutate(reversed_hour = 24 - decimal_hour)
+
+# The function Sys.setlocale() ensures that month names 
+# are in English in the graph below. 
+# The function capture.output() encapsulates the output
+# so as to avoid un message, which is then disposed of. 
+
+dustbin <- capture.output(Sys.setlocale("LC_TIME", "English"))
+rm(dustbin)
+
+# Graph code about reversed_hour
+graph <- df %>%
+  select(created_at, reversed_hour, device) %>%
+  ggplot(aes(created_at, reversed_hour, color = device)) +
+  geom_point(alpha = 0.5) +
+
+  # Specifies y scale.
+  scale_x_datetime(breaks= scales::breaks_width("2 months"),
+                   labels = label_date_short()) +
+  scale_y_continuous(breaks = seq(0, 24, 4), 
+                     labels = c("24", "20", "16", "12", "8", "4", "0")) +
+  
+  # Specifies labels.
+  labs(title = "Tweet Activity per Device",
+       y = "Hour in the 24-Hour Clock") +
+  
+  theme(plot.title = element_text(hjust = 0.5, vjust = 3, 
+                                  size = 16, face = "bold",
+                                  color = deep_blue),
+        axis.title.x = element_blank(), 
+        axis.title.y = element_text(vjust = 2, size = 14, 
+                                    color = deep_blue), 
+        legend.title = element_blank(),
+        axis.text.x = element_text(hjust = 0.5, 
+                                   size = 12, color = deep_blue), 
+        axis.text.y = element_text(size = 12, color = deep_blue),
+        legend.text = element_text(size = 16, face = "bold",
+                                   color = deep_blue),
+        legend.background = element_rect(fill = white),
+        legend.position = "bottom",
+        
+        # Removes the grid line
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        
+        # Formats axis ticks.
+        axis.ticks.x = element_line(size = 2, color = deep_blue),
+        axis.ticks.y = element_line(size = 2, color = deep_blue),
+        
+        panel.border = element_rect(color = deep_blue, fill = NA, 
+                                    size = 2),
+        
+        # Specifies background colors. 
+        panel.background = element_rect(fill = white),
+        plot.background = element_rect(fill = white)) +
+ 
+  # Specifies device colors.
+  scale_color_manual(values = duo_Palette_bluishgreen_gray,
+                     name = NULL) 
+
+# Makes the graph interactive.
+p <- ggplotly(graph, height = 500) %>%
+       layout(legend = list(orientation = "h", x = 0.325, y = -0.2),
+              hoverlabel = list(bordercolor = white))
+
+for (i in 1:2) {
+  
+  # Suppresses hours for redundancy and lack of readability
+  # linked to scale parameterization complexity. 
+  
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "\\<br\\s+\\/\\>reversed_hour:\\s+\\d+.\\d+", 
+                "")
+
+  # Reorders labels so that percentage comes first.
+  p$x$data[[i]]$text <- str_replace(p$x$data[[i]]$text, 
+    "(created_at:\\s+\\d+\\-\\d+\\-\\d+\\s*\\d+:\\d+:\\d+)(\\<br\\s+\\/\\>)(device:\\s+[:alpha:]+)", 
+    "\\3\\2\\1")
+
+  # Refines hover labels.
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "created_at", "Tweet Timestamp")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "device", "Device")
+  
+}
+
+# Centers the graph, because the centering 
+# opts_chunk previously inserted is not operative 
+# in the case of the ggplotly() function.
+
+htmltools::div(p, align = "center")
+
+rm(graph, p)
+
+```
+
+## Breakdown AM/PM
+
+Let's investigate tweet concentration in the 12-hour clock, simply separating days into am and pm. We'll work with percentages because the iPhone device has tweeted somewhat more than the Android device.
+
+```{r Graph breakdown Android iPhone in AM/PM}
+
+graph <- train %>%
+  select(device, am_pm) %>%
+  group_by(am_pm, device) %>%
+  summarize(n = n()) %>%
+  mutate(percent = round(n * 100 / sum(n), 1)) %>%
+  ggplot(aes(am_pm, percent, fill = device)) +
+  geom_bar(width = 0.5, stat = "identity") +
+  scale_y_continuous(breaks = seq(0, 100, 25),
+                     labels = paste(seq(0, 100, 25), "%", sep = " ")) +
+  ggtitle("Breakdown Android/iPhone in AM and PM") +
+  
+  theme(plot.title = element_text(hjust = 0.5, vjust = 3, 
+                                  size = 16, face = "bold",
+                                  color = deep_blue),
+        axis.title.x = element_blank(), 
+        axis.title.y = element_blank(), 
+        legend.title = element_blank(),
+        axis.text.x = element_text(hjust = 0.5, size = 16,
+                                   face = "bold", color = deep_blue), 
+        axis.text.y = element_text(hjust = 0.5, size = 12,
+                                   color = deep_blue),
+        legend.text = element_text(size = 16, face = "bold",
+                                   color = deep_blue),
+        
+        # Removes vertical grid lines.
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        
+        # Removes axis ticks
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        
+        # Colors horizontal grid lines.
+        panel.grid.major.y = element_line(color = sky_blue,
+                                          size = 2),
+        panel.grid.minor.y = element_line(color = sky_blue,
+                                          size = 2),        
+        
+        # Specifies background color. 
+        panel.background = element_rect(fill = white)) +
+  
+  # Specifies device colors.
+  scale_fill_manual(values = duo_Palette_bluishgreen_gray,
+                    name = NULL)  
+
+# Makes the graph interactive.
+p <- ggplotly(graph, height = 500) %>%
+       layout(legend = list(orientation = "h", x = 0.3, y = -0.1),
+              hoverlabel = list(bordercolor = white,
+                                align = "left"))
+
+# Clarifies and refines hover labels.
+for (i in 1:2) {
+
+  # Reorders hover labels so that percentage comes first.
+  p$x$data[[i]]$text <- str_replace(p$x$data[[i]]$text, 
+    "(am_pm:\\s+[:alpha:]+)(\\<br\\s+\\/\\>)(percent:\\s+\\d+\\.\\d)(\\<br\\s+\\/\\>device:\\s+[:alpha:]+)", 
+    "\\3\\4\\2\\1")
+  
+  # Clarifies and refines hover labels. 
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "am_pm", "Part of the day")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "percent", "Percentage of Tweets Sent by Device during this Part of the Day")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "device", "Device")
+  
+}
+
+# Centers the graph, because the centering 
+# opts_chunk previously inserted is not operative 
+# in the case of the ggplotly() function.
+
+htmltools::div(p, align = "center")
+
+```
+
+Clear-cut difference: 66 % in AM for Android, i.e. almost twice as much than iPhone. And in PM, proportions are reversed: 35 % for the Android device and 65 % for the iPhone. 
+
+This positions the breakdown AM/PM as a promising predictor in tweet attribution. Indeed, if it is a tweet tweeted in the AM part of the day, it is more probably a tweet tweeted by the Android device; if it is a tweet tweeted in the second part of the day, it is more probably from the iPhone. These proportions (66/34 or 35/65) provide useful insights with a view to predicting, with a view to tweet attribution. They are meant to measure the breakdown in AM and then in PM between the two devices. 
+They are not meant to measure the proportions between AM and PM in the activity of each device, which would be somewhat different since the iPhone tweeted some more tweets that the Android device. For readers interested in the breakdown AM/PM for each device, here is an appropriate graph. 
+
+```{r Graph am_pm 24 hour-clock}
+
+# Just below, numerous objects from the previous code chunk
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document.
+rm(graph, p)
+
+graph <- train %>%
+  select(device, am_pm) %>%
+  group_by(device, am_pm) %>%
+  summarize(n = n()) %>%
+  mutate(percent = round(n * 100 / sum(n), 1)) %>%
+  ggplot(aes(device, percent, fill = am_pm)) +
+  geom_bar(width = 0.5, stat = "identity") +
+  scale_y_continuous(breaks = seq(0, 100, 25),
+                     labels = paste(seq(0, 100, 25), "%", sep = " ")) +
+  ggtitle("Breakdown AM/PM for Android and iPhone") +
+  
+  theme(plot.title = element_text(hjust = 0.5, vjust = 3, 
+                                  size = 16, face = "bold",
+                                  color = deep_blue),
+        axis.title.x = element_blank(), 
+        axis.title.y = element_blank(), 
+        legend.title = element_blank(),
+        axis.text.x = element_text(hjust = 0.5, size = 16,
+                                   face = "bold", color = deep_blue), 
+        axis.text.y = element_text(hjust = 0.5, size = 12,
+                                   color = deep_blue),
+        legend.text = element_text(size = 16, face = "bold",
+                                   color = deep_blue),
+        
+        # Removes vertical grid lines.
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        
+        # Removes axis ticks
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        
+        # Colors horizontal grid lines.
+        panel.grid.major.y = element_line(color = sky_blue,
+                                          size = 2),
+        panel.grid.minor.y = element_line(color = sky_blue,
+                                          size = 2),        
+        
+        # Specifies background color. 
+        panel.background = element_rect(fill = white)) +
+  
+  # Specifies device colors.
+  scale_fill_manual(values = duo_Palette_crimson_rosequartz,
+                    name = NULL)  
+
+# Makes the graph interactive.
+p <- ggplotly(graph, height = 500) %>%
+       layout(legend = list(orientation = "h", x = 0.3, y = -0.1),
+              hoverlabel = list(bordercolor = white))
+
+# Refines hover labels.
+for (i in 1:2) {
+
+  # Reorders hover labels so that percentage comes first.
+  p$x$data[[i]]$text <- str_replace(p$x$data[[i]]$text, 
+    "(am_pm:\\s+[:alpha:]+)(\\<br\\s+\\/\\>)(percent:\\s+\\d+\\.\\d)(\\<br\\s+\\/\\>device:\\s+[:alpha:]+)", 
+    "\\3\\4\\2\\1")
+  
+  # Clarifies and refines hover labels.
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "am_pm", "Part of the day")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "percent", "Percentage of Tweets Sent by Device during this Part of the Day")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "device", "Device")
+  
+}
+
+# Centers the graph, because the centering 
+# opts_chunk previously inserted is not operative 
+# in the case of the ggplotly() function.
+
+htmltools::div(p, align = "center")
+
+```
+
+Proportions are more balanced for the Android device, with 54 % in AM and 46 % in PM. On the contrary, proportions are steeper for the iPhone, with approximately 25 % and 75 %. This does not at all infirm the usefulness of time decompositions as candidate predictors. It simply compliments previous statements, which have already been made about the graph *Timing of All Tweets* inserted above. The Android's activity is more concentrated between 5 am and 9 am, which explains the higher proportion in am versus pm; neverteless, it remains rather widespread all over the 24-hour clock, with the exception of the hour slot between 1 am and 3 am. The iPhone's activity is concentrated in the second part of the day but is neverteless present in the first part. Actually, time decompositions remain valide candidate predictors but maybe the breakdow AM/PM is not the best one: we could try as well some hours slots such as 5 am to 9 am or pm afte 15, or hours, and also months. E.g. the breakdown between the Android device and the iPhone might be hight unbalanced in favor of the Android device during the first months.  
+
+Let's switch to the same picture per hour in the 24-hour clock. Let's investigate tweet concentration per hour in the 24-hour clock.
+
+<br>
+
+## Breakdown per Hour
+
+```{r Graph of activity per hour and per device}
+
+# Just below, numerous objects from the previous code chunk
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document.
+rm(graph, p)
+
+# Specifies tick values for x axis.
+seq_ticks_x <- seq(0, 20, 4)
+
+# Specifies tick values and labels for y axis.
+
+# First, calculating the percentages of tweet activity
+# per device and for each hour over the whole period. 
+
+buffer <- train %>%
+  select(device, hour) %>%
+  group_by(device, hour) %>%
+  summarize(n = n()) %>%
+  mutate(percent = round(n * 100 / sum(n), 1)) %>%
+  as.data.frame()
+
+# Second, calculating the maximum percentage and the 
+# nearest even integer that is just larger.
+
+max <- max(buffer$percent)
+even_top <- ceiling(max)
+if (even_top %% 2 > 0) {
+  even_top <- even_top + 1 
+}
+
+# Third, determining y axis ticks and labels.
+seq_ticks_y <- seq(0, even_top, 2)
+labels_y <- c(paste(seq_ticks_y, "%", sep = " "))
+
+# Graph of percentages of tweet activity per device
+# per hour over the whole period. 
+
+graph <- buffer %>%
+  ggplot(aes(hour, percent, color = device)) +
+  geom_point(aes(size = percent), 
+             position = position_jitter(width = 0.3, height = 0, 
+                                        seed = 1)) +
+  # Specifies dot sizes.
+  scale_size_continuous(range = c(2, 6)) + 
+
+  # Discards legend referring to dot sizes because that piece 
+  # of information would be redundant with y-axis labels. 
+  guides(size = "none") +
+  
+  # Specifies scales.
+  scale_x_continuous(breaks = seq_ticks_x, 
+                     labels = paste(seq_ticks_x, ".00", sep = "")) +
+  scale_y_continuous(breaks = seq_ticks_y, 
+                     limits = c(min(seq_ticks_y), max(seq_ticks_y)),
+                     labels = labels_y) +
+
+  # Specifies labels.
+  labs(title = "Tweet Activity per Hour per Device over the Whole Period",
+       x = "Hour") +
+  
+  theme(plot.title = element_text(hjust = 0.5, vjust = 3, 
+                                  size = 16, face = "bold",
+                                  color = deep_blue),
+        axis.title.x = element_text(vjust = -1, size = 14,
+                                    color = deep_blue), 
+        axis.title.y = element_blank(), 
+        legend.title = element_blank(),
+        axis.text.x = element_text(size = 12, color = deep_blue), 
+        axis.text.y = element_text(size = 12, color = deep_blue),
+        legend.text = element_text(size = 16, face = "bold",
+                                   color = deep_blue),
+        legend.direction = "vertical",
+        
+        # Removes the vertical grid lines.
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        
+        # Formats axis ticks.
+        axis.ticks.x = element_line(size = 2, color = deep_blue),
+        axis.ticks.y = element_blank(),
+  
+        # Colors horizontal grid lines.
+        panel.grid.major.y = element_line(color = sky_blue,
+                                          size = 2),
+        panel.grid.minor.y = element_line(color = sky_blue,
+                                          size = 2),
+        
+        # Specifies background color.
+        panel.background = element_rect(fill = white)) +
+  
+  # Specifies device colors.
+  scale_color_manual(values = duo_Palette_bluishgreen_gray,
+                     name = NULL) 
+
+# Makes the graph interactive.
+p <- ggplotly(graph, height = 500) %>%
+       layout(hoverlabel = list(bordercolor = white, align = "left"))
+
+# Clarifies hover information. 
+# The for loop is on the two devices.
+# The str_replace() functions are on all hours.
+
+for (i in 1:2) {
+  
+  # Prevents double information about percentage when hovering. 
+  p$x$data[[i]]$text <- 
+    str_replace(p$x$data[[i]]$text, 
+                "\\<br\\s+\\/\\>percent:\\s+\\d+\\.\\d", "")
+  
+  # Reorders hover labels so that percentage comes first.
+  p$x$data[[i]]$text <- str_replace(p$x$data[[i]]$text, 
+    "(hour:\\s+\\d+)(\\<br\\s+\\/\\>device:\\s+[:alpha:]+)(\\<br\\s+\\/\\>)(percent:\\s+\\d+\\.\\d)", 
+    "\\4\\2\\3\\1")
+  
+  # Clarifies and refines hover labels.
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "hour", "Hour")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "device", "Device")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "percent", 
+      "Percentage of Tweets Sent by Device during this Hour")
+  
+} 
+
+# Centers the graph, because the centering opts_chunk 
+# previously inserted is not operative with ggplotly().
+
+htmltools::div(p, align = "center")
+
+rm(buffer, graph, p)
+
+```
+
+We notice a big peak for the Android in early hours of the morning, between 6 and 9 AM (8 according to Raf). There seems to be a clear different in these patterns. 
+
+Some previous research has inferred that two different entities are using these two devices. Autonomy has also been assumed. Personnally, I do not see any proof in the graph. Is this graph incompatible with global coordination but with some lind of specialization in tasks? Concentration varies between devices, but both devices are active around the clock, at least in day averages. The Android device is We'll come back to this point later on, when we have gathered more insights Anyway, this point is not material to our objective, which is retrieving insights to better attribute tweets either to the Android device or to the iPhone device. 
+
+What matters here is the statistical representativeness of these average day schedule curves. 
+
+<br>
+
+## Day Schedule
+
+Would that mean that average day schedule is actually repetitive?
+
+Or would the day schedule vary, day after day? Or month after month? On a day-to-day basis, maybe there is some strict temporal separation between devices? 
+
+Results will be shown under the form of graphs.
+
+```{r Creating a function to produce multiple daily time schedule graphs}
+
+# Creates function building_graph_series to produce series 
+# of daily time schedule graphs. The arguments are d and sub_title. 
+# d is the sample of days that graphs have to be produced for. 
+# sub_titlte is a set of titles for the graphs to be produced. 
+
+building_graph_series <-                          
+  function(d, sub_title) {                          
+    
+    # Scale of x tick marks to be incorporated into ggplot2 graphs
+    seq_ticks_x <- seq(0, 20, 4)
+    
+    # The maximum number of tweets during one hour is useful 
+    # in order to build up a correspondence table for the y scale.
+    # It has been previously calculated using this module.
+    # buffer <- train %>%
+    #   select(id_str, day, hour) %>%
+    #   group_by(day, hour) %>%
+    #   summarise(n = n()) %>%
+    #   arrange(desc(n))
+    # max <- buffer$n[1]
+
+    # That small module has delivered 8 as the value of max
+    # and has permitted to build up the next correspondence table 
+    # between on the one hand the maximum number of tweets 
+    # for one hour during a day and on the other hand the top grid 
+    # and the step between grids.
+    
+    tab <- data.frame(number = 0:8, 
+                      top_grid = c(4, 4, 4, 4, 8, 8, 8, 8, 10),
+                      grid_step = c(1, 1, 1, 1, 2, 2, 2, 2, 2))
+    
+    # Builds up data frame for days in d.
+    tweets_per_day <- train %>%              
+      select(device, day, hour) %>% 
+      
+      # Filters days on the basis of argument d.
+      filter(day %in% d) %>%
+      
+      group_by(device, day, hour) %>%              
+      summarize(number_of_tweets = n()) %>%
+      as.data.frame()
+
+    # Creates storage list l for the graphs to be produced.
+    l <- list(1)                                    
+                                                    
+    # For loop creating graphs for day i from argument d.
+    for (i in seq_along(d)) {                       
+                                            
+      # Filters data further for day i.
+      buffer <- tweets_per_day %>%                
+        filter(day == d[i]) %>%                     
+        as.data.frame()
+      
+      # Scale of y tick marks to be incorporated into graph
+      # referring to the correspondence table defined above
+      max <- max(buffer$number_of_tweets) + 1
+      top_grid <- tab$top_grid[max]
+      grid_step <- tab$grid_step[max]
+      seq_ticks_y <- seq(0, top_grid, grid_step)   
+      
+      # To keep mastering symbolic colors: Android's green
+      # and Apple's black (or gray but we have chosen black).
+      # To do so, let's compute the number of Android's tweets
+      # for day i: indeed, if there is no Android's tweet,
+      # an iPhone's tweet number, which alphabetically comes
+      # second, would rank first for colors ... and take 
+      # Android's green color over. 
+      temp <- buffer %>% 
+        filter(device == "Android") 
+      n_android <- nrow(temp)
+      palette <- duo_Palette_bluishgreen_gray
+      if (n_android == 0) { 
+        palette <- c(gray_palette, gray_palette)
+        }
+      
+      # For further use
+      temp <- buffer %>% 
+        filter(device == "iPhone") 
+      n_iphone <- nrow(temp)
+      
+      # Creates graph for day i.
+      graph <- buffer %>% 
+        ggplot(aes(hour, number_of_tweets, color = device)) +
+        
+        # Creates dot gradience.
+        geom_point(aes(size = number_of_tweets)) +  
+        
+        # Specifies dot size range.
+        scale_size_continuous(range = c(4, 6)) +
+        
+        # Discards legend for dot size since dot size meaning
+        # will show on the y-axis and when hovering upon dots.
+        guides(size = "none") +    
+        
+        scale_x_continuous(breaks = seq_ticks_x, limits = c(0, 23), 
+                           labels = seq_ticks_x) +
+        
+        scale_y_continuous(breaks = seq_ticks_y, limits = c(0, top_grid),
+                           labels = seq_ticks_y) +
+
+        # Labels for graph of day i. 
+        labs(title = paste(sub_title, "-", "Day", i, ":", d[i], sep = " "),
+             x = "Hour",
+             y = "Number of Tweets",
+             color = "") +
+        
+        # Layout for day i graph
+        theme(plot.title = element_text(hjust = 0.5, vjust = 2, 
+                                        size = 16, face = "bold",
+                                        color = deep_blue),
+              axis.title.x = element_text(vjust = -1, size = 14,
+                                          color = deep_blue), 
+              axis.title.y = element_text(vjust = 3, size = 14,
+                                          color = deep_blue), 
+              legend.title = element_blank(),
+              axis.text.x = element_text(hjust = 1, size = 12,
+                                         color = deep_blue), 
+              axis.text.y = element_text(size = 12, color = deep_blue),
+              legend.text = element_text(size = 16, face = "bold",
+                                         color = deep_blue),
+              
+              # Removes the vertical grid lines.
+              panel.grid.major.x = element_blank(),
+              panel.grid.minor.x = element_blank(),
+        
+              # Removes y-axis ticks
+              axis.ticks.y = element_blank(),
+  
+              # Colors horizontal grid lines.
+              panel.grid.major.y = element_line(color = sky_blue,
+                                                size = 2),
+              panel.grid.minor.y = element_line(color = sky_blue,
+                                                size = 2),
+        
+              # Specifies background color. 
+              panel.background = element_rect(fill = white)) +
+        
+        # Specifies color palette for the 2 devices.
+        # If there is no tweet from the Android device 
+        # during a day that is depicted in a graph,
+        # we do not want iPhone's values to take over
+        # Android's green color: we want Apple (iPhone)
+        # to keep its black color, for visual consistency.
+        scale_color_manual(values = palette)
+        
+    # Makes the graph interactive.
+    p <- ggplotly(graph, height = 360) %>%
+           layout(hoverlabel = list(bordercolor = white))
+                  
+    # Clarifies hover information. 
+    
+    # First case scenario: there are tweets from both devices.
+    # The for loop is on the two devices.
+    # The str_replace() function works on all hours.
+
+    if (n_android > 0 & n_iphone > 0) {
+      
+    for (j in 1:2) {
+
+      # Prevents getting some hover information twice. 
+      p$x$data[[j]]$text <- 
+        str_replace(p$x$data[[j]]$text, 
+                    "\\<br\\s+\\/\\>number_of_tweets:\\s+\\d", "")
+      
+      # Reorders labels so that percentage comes first.
+      p$x$data[[j]]$text <- str_replace(p$x$data[[j]]$text, 
+        "(hour:\\s+\\d+)(\\<br\\s+\\/\\>device:\\s+[:alpha:]+)(\\<br\\s+\\/\\>)(number_of_tweets:\\s+\\d+)",
+        "\\4\\2\\3\\1")
+      
+      # Refines hover labels.
+      p$x$data[[j]]$text <- 
+        str_replace_all(p$x$data[[j]]$text, "hour", "Hour")
+      p$x$data[[j]]$text <- 
+        str_replace_all(p$x$data[[j]]$text, "device", "Device")
+      p$x$data[[j]]$text <- 
+        str_replace_all(p$x$data[[j]]$text, "number_of_tweets", 
+                        "Number of Tweets Sent by Device in this Hour")
+  
+    } 
+    }
+    
+    # Second case scenario: there are no tweets from one device 
+    # but there is at least one tweet from the other device. 
+    
+    if ((n_android == 0 | n_iphone == 0) & 
+        (n_android > 0 | n_iphone > 0)) {
+      
+      p$x$data[[1]]$text <- 
+        str_replace(p$x$data[[1]]$text, 
+                    "\\<br\\s+\\/\\>number_of_tweets:\\s+\\d", "")
+      
+      # Reorders labels so that percentage comes first.
+      p$x$data[[1]]$text <- str_replace(p$x$data[[1]]$text, 
+        "(hour:\\s+\\d+)(\\<br\\s+\\/\\>device:\\s+[:alpha:]+)(\\<br\\s+\\/\\>)(number_of_tweets:\\s+\\d+)",
+        "\\4\\2\\3\\1")
+      
+      # Refines hover labels.
+      p$x$data[[1]]$text <- 
+        str_replace_all(p$x$data[[1]]$text, "hour", "Hour")
+      p$x$data[[1]]$text <- 
+        str_replace_all(p$x$data[[1]]$text, "device", "Device")
+      p$x$data[[1]]$text <- 
+        str_replace_all(p$x$data[[1]]$text, "number_of_tweets", 
+                        "Number of Tweets Sent by Device in this Hour")
+  
+    }
+    
+    # Places graph i into list of graphs.
+    l[[i]] <- p 
+    
+    }                                             
+
+# Prints all graphs corresponding to day range d.     
+htmltools::tagList(l)
+
+}
+```
+
+48 day schedule graphs will be produced and analyzed:
+
+- 4 graphs picked up at random,
+- 2 graphs with the top days in global activity,
+- 2 graphs with the top days in Android activity,
+- 2 graphs with the top days in iPhone activity. 
+
+For brevity reasons, not all of them will be visualized below. For illustrative purposes, ten of them are reproduced below: 
+
+- 4 graphs picked up at random,
+- 2 graphs with the top days in global activity,
+- 2 graphs with the top days in Android activity,
+- 2 graphs with the top days in iPhone activity.
+
+Conclusions drawn on the basis of the 48 graphs or on the basis of the 10 graphs are the same. Let's examine the 10 graphs, group by group. Let's get started with the 4 graphs produced at random. 
+
+<br>
+
+```{r 12 graphs at random}
+
+# Let's determine the number of graphs.
+sample_size <- 12
+
+# Let's establish of list of days. 
+days <- unique(train$day)
+
+# Let's select days at random. 
+
+set.seed(1)
+sample_r <- sample(days, sample_size, replace = FALSE)
+
+# Let's determine the subtitle of the graphs,
+# the title being automatically generated. 
+
+sub_title <- "Random Pick"
+
+# Calls function building_graph_series 
+# to produce the 4 graphs.
+
+building_graph_series(sample_r, sub_title)
+
+```
+
+In day 1, Android activity spread in the morning and in the evening. 
+
+In day 2, as described am-pm.
+
+On day 3, Android activity spread in the morning and in the evening.
+
+On day 4, Android activity spread in the morning and in the evening, with even more in the evening; moreover, concomitance Android and iPhone!
+
+In a snapshot, days 1, 3 and 4, the Android device was active in the am and in the pm period. Moreover, during day 4, the Android's activity was concomitant in the am and in the pm period with the iPhone's activity.
+
+Conclusions were similar when drawn from a 30-day sample.
+
+Let's turn to the top activity days. First, the two top activity days of the two devices together.  
+
+<br>
+
+```{r graphs of the 2 top actitiy days of the 2 devices taken together}
+
+# Just below, numerous objects from the previous code chunk
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document.
+rm(sample_size, days, sub_title)
+
+# Let's build up a sample based on 
+# global tweet activity per day, called 
+# sample_g, g standing for "global tweet activity".
+
+sample_size <- 2
+
+sample_g <- train %>%
+  select(day) %>% 
+  
+  # Prevents picking a day already addressed above.
+  filter(!day %in% sample_r) %>%
+  
+  group_by(day) %>% 
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>%
+  head(., sample_size) 
+
+# Keeps the 2 top days for printed graphs.  
+d <- sample_g$day 
+
+sub_title <- "Top Tweet Activity"
+
+# Calls the function building_graph_series
+# to produce the two graphs. 
+building_graph_series(d, sub_title)
+
+```
+
+<br>
+
+```{r 2 graphs of top Android actitiy days}
+
+# Just below, 3 objects from the previous code chunk
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document. 
+rm(sample_size, d, sub_title)
+
+# Vector of days
+days <- unique(train$day)
+
+# Excluding the 2 day vectors previously used.
+
+# Let's build up a sample based on global tweet activity per day,
+# called sample_g, a being for "Android tweet activity".
+sample_size <- 2
+sample_a <- train %>%
+  filter(device == "Android") %>%
+  select(day) %>%  
+  filter(!day %in% sample_r & 
+           !day %in% sample_g$day) %>%
+  group_by(day) %>% 
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>%
+  head(., sample_size) 
+
+# Keeping the 2 top days for printed graphs.  
+d <- sample_a$day
+
+sub_title <- "Top Android's Activity"
+
+building_graph_series(d, sub_title)
+
+```
+
+<br>
+
+```{r 2 graphs of top iPhone actitiy days}
+
+# Just below, 3 objects from the previous code chunk
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document.
+rm(sample_size, d, days)
+
+# Vector of days
+days <- unique(train$day)
+
+# Let's build up a sample based on global tweet activity per day,
+# called sample_i, i being for "iPhone tweet activity".
+sample_size <- 2
+sample_i <- train %>%
+  filter(device == "iPhone") %>%
+  select(day) %>%  
+  filter(!day %in% sample_r & 
+           !day %in% sample_g$day &
+           !day %in% sample_a$day) %>%
+  group_by(day) %>% 
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>%
+  head(., sample_size) 
+
+# Keeping the 2 top days for printed graphs.  
+d <- sample_i$day
+
+sub_title <- "Top iPhone's Activity"
+
+building_graph_series(d, sub_title)
+
+```
+
+Visual evidence provided by the 10 day schedule graphs suggests rather great variety in day schedule away from average day schedules per device. 
+
+Let's get broader insights about dayly time schedule, using the whole dataset. We've illustrated variety, let's now illustrate proximity.  
+
+<br> 
+
+## Hour Slots
+
+```{r Intermingling measurement bi-device time slots}
+
+# Just below, 7 objects from previous code
+# are deleted. They are deleted here to decrease 
+# the number of fold buttons in the rendered HTML document.
+
+rm(sample_size, d, days)
+rm(sample_a, sample_g, sample_i, sample_r)
+
+df <- train %>%                            # Temporary data frame
+  select(device, id_str, created_at, hour)  
+
+df_android <- df %>%                              # Android only
+  filter(device == "Android") %>%                  
+  select(- device)
+
+df_iphone <- df %>%                               # iPhone only
+  filter(device == "iPhone") %>%
+  select(- device)
+
+df1 <- df_android
+df2 <- df_iphone
+hour_slots_duration <- 1:4
+
+output <- data.frame(matrix(1:16, nrow = 4, ncol = 4) * 1) %>%
+  `row.names<-`(c("Android Tweets coexisting in Same Hour Slot 
+                  with iPhone Tweet(s)", 
+                  "iPhone Tweets coexisting in Same Hour Slot 
+                  with Android Tweet(s)", 
+                  "TOTAL", 
+                  "% of Training Set")) %>%
+  `colnames<-`(c(paste0(hour_slots_duration, "-hour Slot")))
+
+for (j in hour_slots_duration) {
+  
+    coex <- vector(mode = "character", length = 0)
+
+    for (i in 1:nrow(df1)) {
+      
+      date_ref <- df1$created_at[i]
+      
+      temp <- df2 %>%
+        mutate(diff = difftime(created_at, date_ref, 
+                               units = "hours"))
+
+      diff_pos <- which(temp$diff > 0 & temp$diff <= j)
+      
+      diff_neg <- which(temp$diff < 0 & temp$diff >= -j) 
+      
+      diff_zero <- which(temp$diff == 0)
+      
+      index <- append(diff_pos, diff_neg) 
+      index <- append(index, diff_zero)
+  
+      if(length(index) > 0) {
+        prox <- append(df1$id_str[i], df2$id_str[index])
+        coex <- append(coex, prox)
+      }
+    }
+
+    coex <- unique(coex)
+    
+    # How many from Android and from iPhone?
+    split_coex <- train %>%
+      filter(id_str %in% coex) %>%
+      select(device) %>%
+      group_by(device) %>%
+      summarise(n = n()) %>%
+      as.data.frame()
+    
+    output[[1, j]] <- split_coex$n[1]
+    output[[2, j]] <- split_coex$n[2]
+
+}
+
+# Completes dataframe "output".
+
+for (i in 1:length(hour_slots_duration)) {
+  
+  # Adds line 1 and line 2 to get total in line 3.
+  output[[3, i]] <- output[1, i] + output[2, i]
+  
+  # Computes the totals in row 3 as percentages of 
+  # number of observations in the training set. 
+  dummy <- round(output[3, i] * 100 / nrow(train), 1) 
+  dummy <- paste(dummy, "%", sep = " ")
+  output[[4, i]] <- dummy
+}
+
+# Printing table with "bg-primary" layout. 
+
+knitr::kable(output, align = "c",  
+             table.attr = "class=\'bg-primary\'") %>% 
+  kableExtra::kable_styling()
+
+```
+
+<br>
+
+This is a try to quantify intermingling between Android tweets and iPhone tweets. On that basis, intermingling, proximity, has been evaluated at more than one fourth, or even on third if all tweets are taken into account.
+
+In a snapshot, day schedule has shown variety away from the average day schedule per device. On the contrary, some temporal proximity has been shown in one third of tweets in the case of 3-hour slots. 
+
+Let's remember that the hour slots are determined by taking into account the hour of the tweets, but the number of hours has a decimal part, which implies that e.g. a 3-hour slot is limited exactly to 180 minutes. 
+
+Let's also remember that the Android devices tweeted more in AM and the iPhone more in PM. Even if all iPhone's tweets had been tweeted after all Android's tweets during the same day, even in that case there would some measured proximity because e.g. Android's tweets during hour 11 a.m. would be in the same 3-hour slot as an iPhone's tweet during hour 2 p.m. So, if there had been perfect shift work during two separate parts of the day, nevertheless we woul measure such proximity. 
+
+To remedy that possible bias, let's exclude all tweets sent, let's say, after 11 a.m. and before 2 p.m.  
+
+
+```{r Intermingling_measurement bi-device time slots with break}
+
+# Just below, numerous objects from previous code 
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document.
+
+rm(df, df1, df2, output, split_coex, temp)
+rm(coex, date_ref, diff_neg, diff_pos, diff_zero, dummy)
+rm(hour_slots_duration, i, index, j, prox, sub_title)
+
+# Intermediary data with hour slot duration 
+# plus begin and end of break
+
+hour_slots_duration <- 1:4
+break_begin <- c(12, 12, 11, 11)
+break_end <- c(13, 14, 14, 15)
+
+# Output table 
+
+output <- data.frame(matrix(1:16, nrow = 4, ncol = 4) * 1) %>%
+  `row.names<-`(c("Android Tweets coexisting in Same Hour Slot 
+                  with iPhone Tweet(s)", 
+                  "iPhone Tweets coexisting in Same Hour Slot 
+                  with Android Tweet(s)", 
+                  "TOTAL",
+                  "% of Number of Tweets")) %>%
+  `colnames<-`(c(paste0(hour_slots_duration, "-hour Slot")))
+
+# For loop on hour slot furation, begin and end of break 
+
+for (j in hour_slots_duration) {
+
+  # Excluding Android tweets tweeted during break
+  df_android_short <- df_android %>%           
+  filter(hour < break_begin[j] | hour >= break_end[j])                   
+
+  # Excluding iPhone tweets tweeted during break
+  df_iphone_short <- df_iphone %>%                 
+  filter(hour < break_begin[j] | hour >= break_end[j])                 
+
+  # Builds up new data frames after excluding break tweets.
+  df1 <- df_android_short
+  df2 <- df_iphone_short
+
+  # Intermediary output vector from for loop on tweets
+  coex <- vector(mode = "character", length = 0)
+
+  # For loop on tweets
+  
+  for (i in 1:nrow(df1)) {
+      
+    date_ref <- df1$created_at[i]
+      
+    temp <- df2 %>%
+      mutate(diff = difftime(created_at, date_ref, 
+                             units = "hours"))
+
+      diff_pos <- which(temp$diff > 0 & temp$diff <= j)
+      
+      diff_neg <- which(temp$diff < 0 & temp$diff >= -j) 
+      
+      diff_zero <- which(temp$diff == 0)
+      
+      index <- append(diff_pos, diff_neg) 
+      index <- append(index, diff_zero)
+  
+      if(length(index) > 0) {
+        prox <- append(df1$id_str[i], df2$id_str[index])
+        coex <- append(coex, prox)
+      }
+  }
+
+    coex <- unique(coex)
+    
+    # How many from Android and from iPhone?
+    split_coex <- train %>%
+    filter(id_str %in% coex) %>%
+    select(device) %>%
+    group_by(device) %>%
+    summarise(n = n()) %>%
+    as.data.frame()
+    
+    output[[1, j]] <- split_coex$n[1]
+    output[[2, j]] <- split_coex$n[2]
+    
+    # Adds line 1 and line 2 to get total in line 3.
+    output[[3, j]] <- output[1, j] + output[2, j]
+  
+    # Computes number of tweets during break.
+    break_tweets <- nrow(df_android) + 
+                    nrow(df_iphone) -
+                    nrow(df_android_short) - 
+                    nrow(df_iphone_short)
+    
+    # Number of tweets after excluding break tweets
+    nr_obs <- nrow(train) - break_tweets
+    
+    # Percentage of intermingling
+    dummy <- round(output[3, j] * 100 / nr_obs, 1)
+  
+    # Formats percentage.
+    dummy <- paste(dummy, "%", sep = " ")
+    
+    # Inserts percentage.
+    output[[4, j]] <- dummy    
+}
+
+# Printing table with "bg-primary" layout. 
+
+knitr::kable(output, align = "c",  
+             table.attr = "class=\'bg-primary\'") %>% 
+  kableExtra::kable_styling()
+
+```
+
+Actually, excluding break tweets have hardly lowered intermingling. Almost one fourth of tweets outside of breaks have in the same 2-hour slot at least one tweet from the other device. Almost 30 % of tweets outside of breaks have in the same 2-hour slot at least one tweet from the other device. 
+
+This is no statistical support for the idea of shift work. 
+
+Could hour be an effective predictor for attribution? This will be tested. The same holds for the breakdown am/pm, which will also be tested as an attribution predictor. Publication time will be used as a predictor to attribute tweets, in hour format or am-pm. 
+
+But would day schedule also vary month after month? Let's try to retrieve pre-attentive insights from drawing am-pm breakdown per month and per device. 
+
+<br>
+
+## AM/PM per month
+
+Maybe the percentage of AM and PM varies per month and per device. If this be the case, it might be useful to use that percentage as an attribution predictor. Let's have a look at the percentages of AM and PM for the Android device.
+
+```{r Graph AM per month for Android}
+
+# Just below, numerous objects from previous code
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document.
+
+rm(df_android, df_android_short)
+rm(df_iphone, df_iphone_short, df1, df2)
+rm(output, split_coex, temp)
+rm(break_begin, break_end, break_tweets)
+rm(coex, date_ref, diff_neg, diff_pos, diff_zero)
+rm(dummy, hour_slots_duration)
+rm(i, index, j, nr_obs, prox)
+
+# Let's switch to the new graph.
+seq_ticks_y <- c(0, 25, 50, 75, 100)
+labels_y <- c(paste(seq_ticks_y, "%", sep = ""))
+
+graph <- train %>%
+  filter(device == "Android") %>%
+  select(month, am_pm) %>%
+  group_by(month, am_pm) %>%
+  summarize(n = n()) %>%
+  mutate(percent = round(n * 100 / sum(n), 1)) %>%
+  ggplot(aes(month, percent, fill = am_pm)) +
+  geom_bar(stat = "identity") +
+  scale_x_datetime(breaks= scales::breaks_width("2 months"),
+                   labels = label_date_short()) +
+  scale_y_continuous(breaks = seq_ticks_y, 
+                     limits = c(min(seq_ticks_y), 
+                                max(seq_ticks_y)),
+                     labels = labels_y) +
+  ggtitle("AM/PM per Month for Android") +
+  labs(x = "",
+       y = "% of Tweets",
+       fill = "") +
+  theme(plot.title = element_text(hjust = 0.5, size = 16, 
+                                  face = "bold", color = white),
+        axis.title.x = element_blank(), 
+        axis.title.y = element_text(size = 14,
+                                    color = white), 
+        legend.title = element_blank(),
+        axis.text.x = element_text(hjust = 1, 
+                                   size = 12, color = white),
+        axis.text.y = element_text(size = 12, color = white),
+        legend.text = element_text(size = 14, color = white),
+        legend.background = element_rect(fill = bluish_green),
+        
+        # Removes the vertical grid lines.
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        
+        # Colors horizontal grid lines.
+        panel.grid.major.y = element_line(size = 2, color = white),
+        panel.grid.minor.y = element_line(size = 2, color = white),     
+        
+        # Formats axis ticks.
+        axis.ticks.x = element_line(size = 4, color = white),
+        axis.ticks.y = element_blank(),
+        
+        # Specifies background color. 
+        panel.background = element_rect(fill = bluish_green),
+        plot.background = element_rect(fill = bluish_green)) +
+  
+  # Specifies device colors.
+
+  scale_fill_manual(values = duo_Palette_white_yellow)  
+
+# Makes the graph interactive.
+p <- ggplotly(graph, height = 500) %>%
+       layout(legend = list(orientation = "h", x = 0.325, y = -0.2),
+              hoverlabel = list(align = "left"))
+
+# Simplifies hover information.
+
+month_names <- c("Jun 2015", "Jul 2015", "Aug 2015", "Sep 2015", 
+                 "Oct 2015", "Nov 2015", "Dec 2015", "Jan 2016", 
+                 "Feb 2016", "Mar 2016", "Apr 2016", "May 2016",
+                 "Jun 2016", "Jul 2016", "Aug 2016", "Sep 2016", 
+                 "Oct 2016", "Nov 2016")
+
+for (i in 1:2) {
+  
+  # Suppresses month names for lack of readability.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "month:\\s+\\d+-\\d+-\\d+\\s+\\d+:\\d+:\\d+\\<br\\s+\\/\\>", 
+                "")
+  
+  # Inserts buffer sequence to be replaced at the next steps.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "\\<", 
+                "tabulationmonthnames<")
+  
+  # Inserts tabulation instruction.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "tabulation", 
+                "\\<br \\/\\>") 
+  
+  # Inserts standardized month names.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "monthnames", 
+                paste("month: ", month_names))
+  
+  # Reorders labels so that percentage comes first.
+  p$x$data[[i]]$text <- str_replace(p$x$data[[i]]$text, 
+    "(percent:\\s+\\d+\\.\\d)(\\<br\\s+\\/\\>month:\\s+[:alpha:]+\\s+\\d+)(\\<br\\s+\\/\\>am_pm:\\s+[:alpha:]+)", 
+    "\\1\\3\\2")
+
+  # Clarifies and refines hover labels.
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "percent", 
+      "Percentage of Android Tweets in this Part of the Day this Month")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "month", "Month")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "am_pm", 
+                    "Part of the Day")
+  
+}
+      
+# Centers the graph, because the centering 
+# opts_chunk previously inserted is not operative 
+# in the case of the ggplotly() function.
+
+htmltools::div(p, align = "center")
+
+```
+
+<br>
+
+On the graph above, we see that the percentage of AM is usually above 50 %, but there are exceptions, especially the first and the fourth periods. What about the percentages of the iPhone?
+
+```{r Graph AM per month for iPhone}
+
+# Just below, numerous objects from the previous code chunk
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document.
+rm(graph, p)
+
+seq_ticks_y <- c(0, 25, 50, 75, 100)
+labels_y <- c(paste(seq_ticks_y, "%", sep = ""))
+
+graph <- train %>%
+  filter(device == "iPhone") %>%
+  select(month, am_pm) %>%
+  group_by(month, am_pm) %>%
+  summarize(n = n()) %>%
+  mutate(percent = round(n * 100 / sum(n), 1)) %>%
+  ggplot(aes(month, percent, fill = am_pm)) +
+  geom_bar(stat = "identity") +
+  scale_x_datetime(breaks= scales::breaks_width("2 months"),
+                   labels = label_date_short()) +
+  scale_y_continuous(breaks = seq_ticks_y, 
+                     limits = c(min(seq_ticks_y), 
+                                max(seq_ticks_y)),
+                     labels = labels_y) +
+  ggtitle("AM/PM per Month for iPhone") +
+  labs(x = "",
+       y = "% of Tweets",
+       fill = "") +
+  theme(plot.title = element_text(hjust = 0.5, size = 16, 
+                                  face = "bold", color = white),
+        axis.title.x = element_blank(), 
+        axis.title.y = element_text(size = 14,
+                                    color = white), 
+        legend.title = element_blank(),
+        axis.text.x = element_text(hjust = 1, 
+                                   size = 12, color = white),
+        axis.text.y = element_text(size = 12, color = white),
+        legend.text = element_text(size = 14, color = white),
+        legend.background = element_rect(fill = gray),
+        
+        # Removes the vertical grid lines.
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        
+        # Colors horizontal grid lines.
+        panel.grid.major.y = element_line(size = 2, color = white),
+        panel.grid.minor.y = element_line(size = 2, color = white),     
+        
+        # Formats axis ticks.
+        axis.ticks.x = element_line(size = 4, color = white),
+        axis.ticks.y = element_blank(),
+        
+        # Specifies background color. 
+        panel.background = element_rect(fill = gray),
+        plot.background = element_rect(fill = gray)) +
+  
+  # Specifies device colors.
+  scale_fill_manual(values = duo_Palette_white_yellow)  
+
+# Makes the graph interactive and manages layout of 
+# legend and hover labels. 
+
+p <- ggplotly(graph, height = 500) %>%
+       layout(legend = list(orientation = "h", x = 0.325, y = -0.2),
+              hoverlabel = list(align = "left"))
+
+# Simplifies hover information.
+month_names <- c("Jun 2015", "Jul 2015", "Aug 2015", "Sep 2015", 
+                 "Oct 2015", "Nov 2015", "Dec 2015", "Jan 2016", 
+                 "Feb 2016", "Mar 2016", "Apr 2016", "May 2016",
+                 "Jun 2016", "Jul 2016", "Aug 2016", "Sep 2016", 
+                 "Oct 2016", "Nov 2016")
+
+for (i in 1:2) {
+  
+  # Suppresses month names for lack of readibility.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+      "month:\\s+\\d+-\\d+-\\d+\\s+\\d+:\\d+:\\d+\\<br\\s+\\/\\>", 
+      "")
+  
+  # Inserts buffer sequence to be replaced at the next steps.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "\\<", 
+                "tabulationmonthnames<")
+  
+  # Inserts tabulation instruction.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "tabulation", 
+                "\\<br \\/\\>") 
+  
+  # Inserts standardized month names.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "monthnames", 
+                paste("month: ", month_names))
+  
+  # Reorders labels so that percentage comes first.
+  p$x$data[[i]]$text <- str_replace(p$x$data[[i]]$text, 
+    "(percent:\\s+\\d+\\.\\d)(\\<br\\s+\\/\\>month:\\s+[:alpha:]+\\s+\\d+)(\\<br\\s+\\/\\>am_pm:\\s+[:alpha:]+)", 
+    "\\1\\3\\2")
+  
+  # Clarifies and refines hover labels.
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "percent", 
+      "Percentage of iPhone Tweets in this Part of the Day this Month")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "month", "Month")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "am_pm", 
+                    "Part of the Day")
+  
+}
+
+# Centers the graph, because the centering 
+# opts_chunk previously inserted is not operative 
+# in the case of the ggplotly() function.
+
+htmltools::div(p, align = "center")
+
+```
+
+For the iPhone, the percentage of AM is usually below 25 %. The percentage of PM is usually above 75 %, in two thirds of periods. For the second period in particular, percenages are diametrically opposed: 62 % AM for the Android device, 13 % for the iPhone. 
+
+This predictor is worth a try.
+
+Instead of percentages of AM and PM per month and per device, it might also make sense to calculate the percentages of devices per month and per part of the day. Let's draw two graphs on that basis. 
+
+
+```{r Graph AM for both devices per month}
+
+# Just below, numerous objects from the previous code chunk
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document.
+rm(graph, p)
+
+# Let's switch to the new graph.
+seq_ticks_y <- c(0, 25, 50, 75, 100)
+labels_y <- c(paste(seq_ticks_y, "%", sep = ""))
+
+graph <- train %>%
+  select(device, month, am_pm) %>%
+  filter(am_pm == "AM") %>%
+  group_by(month, device) %>%
+  summarize(n = n()) %>%
+  mutate(percent = round(n * 100 / sum(n), 1)) %>%
+  ggplot(aes(month, percent, fill = device)) +
+  geom_bar(stat = "identity") +
+  scale_x_datetime(breaks= scales::breaks_width("2 months"),
+                   labels = label_date_short()) +
+  scale_y_continuous(breaks = seq_ticks_y, 
+                     limits = c(min(seq_ticks_y), 
+                                max(seq_ticks_y)),
+                     labels = labels_y) +
+  ggtitle("AM per Month per Device") +
+  labs(x = "",
+       y = "% of Tweets",
+       fill = "") +
+  theme(plot.title = element_text(hjust = 0.5, size = 16, 
+                                  face = "bold", color = deep_blue),
+        axis.title.x = element_blank(), 
+        axis.title.y = element_text(size = 14, color = deep_blue), 
+        legend.title = element_blank(),
+        axis.text.x = element_text(hjust = 1, 
+                                   size = 12, color = deep_blue),
+        axis.text.y = element_text(size = 12, color = deep_blue),
+        legend.text = element_text(size = 14, color = deep_blue),
+        legend.background = element_rect(fill = white),
+        
+        # Removes the vertical grid lines.
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        
+        # Colors horizontal grid lines.
+        panel.grid.major.y = element_line(size = 2, color = sky_blue),
+        panel.grid.minor.y = element_line(size = 2, color = sky_blue),     
+        
+        # Formats axis ticks.
+        axis.ticks.x = element_line(size = 8, color = deep_blue),
+        axis.ticks.y = element_blank(),
+        
+        # Specifies background color. 
+        panel.background = element_rect(fill = white),
+        plot.background = element_rect(fill = white)) +
+  
+  # Specifies device colors.
+
+  scale_fill_manual(values = duo_Palette_bluishgreen_gray)  
+
+# Makes the graph interactive.
+p <- ggplotly(graph, height = 500) %>%
+       layout(legend = list(orientation = "h", x = 0.3, y = -0.2),
+              hoverlabel = list(bordercolor = white))
+
+# Simplifies hover information.
+
+month_names <- c("Jun 2015", "Jul 2015", "Aug 2015", "Sep 2015", 
+                 "Oct 2015", "Nov 2015", "Dec 2015", "Jan 2016", 
+                 "Feb 2016", "Mar 2016", "Apr 2016", "May 2016",
+                 "Jun 2016", "Jul 2016", "Aug 2016", "Sep 2016", 
+                 "Oct 2016", "Nov 2016")
+
+for (i in 1:2) {
+  
+  # Suppresses month names for lack of readibility.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "month:\\s+\\d+-\\d+-\\d+\\s+\\d+:\\d+:\\d+\\<br\\s+\\/\\>", 
+                "")
+  
+  # Inserts buffer sequence to be replaced at the next steps.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "\\<", 
+                "tabulationmonthnames<")
+  
+  # Inserts tabulation instruction.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "tabulation", 
+                "\\<br \\/\\>") 
+  
+  # Inserts standardized month names.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "monthnames", 
+                paste("month: ", month_names))
+  
+  # Clarifies and refines hover labels.
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "percent", 
+                    "Percentage of Tweets Sent by Device in AM")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "month", "Month")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "device", "Device")
+  
+}
+
+# Centers the graph, because the centering 
+# opts_chunk previously inserted is not operative 
+# in the case of the ggplotly() function.
+
+htmltools::div(p, align = "center")
+
+```
+
+Actually, the graph above shows something that did not appear clearly on the two graphs above this one: there is an upward trend of the percentage of iPhone tweets.
+
+During periods 1, 2, 3 and 5, the percentage of the Android device in the AM part of the day is predominant: it is more than 87 %. It is very different in the last but one or two periods, with percentages below 37 %!
+
+Actually, this does not necessarily come from the percentages of each device between AM and PM, this can also originate in the volume of tweets tweeted by each device, which can vary over time; we will check that up later on. 
+
+Let's now do the same for the PM part of the day. 
+
+
+```{r Graph PM for both devices per month}
+
+# Just below, numerous objects from the previous code chunk
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document.
+rm(graph, p)
+
+# Let's switch to the new graph.
+seq_ticks_y <- c(0, 25, 50, 75, 100)
+labels_y <- c(paste(seq_ticks_y, "%", sep = ""))
+
+graph <- train %>%
+  select(device, month, am_pm) %>%
+  filter(am_pm == "PM") %>%
+  group_by(month, device) %>%
+  summarize(n = n()) %>%
+  mutate(percent = round(n * 100 / sum(n), 1)) %>%
+  ggplot(aes(month, percent, fill = device)) +
+  geom_bar(stat = "identity") +
+  scale_x_datetime(breaks= scales::breaks_width("2 months"),
+                   labels = label_date_short()) +
+  scale_y_continuous(breaks = seq_ticks_y, 
+                     limits = c(min(seq_ticks_y), 
+                                max(seq_ticks_y)),
+                     labels = labels_y) +
+  ggtitle("PM per Month per Device") +
+  labs(x = "",
+       y = "% of Tweets",
+       fill = "") +
+  theme(plot.title = element_text(hjust = 0.5, size = 16, 
+                                  face = "bold", color = deep_blue),
+        axis.title.x = element_blank(), 
+        axis.title.y = element_text(size = 14,
+                                    color = deep_blue), 
+        legend.title = element_blank(),
+        axis.text.x = element_text(hjust = 1, 
+                                   size = 12, color = deep_blue),
+        axis.text.y = element_text(size = 12, color = deep_blue),
+        legend.text = element_text(size = 14, color = deep_blue),
+        legend.background = element_rect(fill = white),
+        
+        # Removes the vertical grid lines.
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        
+        # Colors horizontal grid lines.
+        panel.grid.major.y = element_line(size = 2, color = sky_blue),
+        panel.grid.minor.y = element_line(size = 2, color = sky_blue),     
+        
+        # Formats axis ticks.
+        axis.ticks.x = element_line(size = 8, color = deep_blue),
+        axis.ticks.y = element_blank(),
+        
+        # Specifies background color. 
+        panel.background = element_rect(fill = white),
+        plot.background = element_rect(fill = white)) +
+  
+  # Specifies device colors.
+
+  scale_fill_manual(values = duo_Palette_bluishgreen_gray)  
+
+# Makes the graph interactive.
+p <- ggplotly(graph, height = 500) %>%
+       layout(legend = list(orientation = "h", x = 0.3, y = -0.2),
+              hoverlabel = list(bordercolor = white))
+
+# Simplifies hover information.
+
+month_names <- c("Jun 2015", "Jul 2015", "Aug 2015", "Sep 2015", 
+                 "Oct 2015", "Nov 2015", "Dec 2015", "Jan 2016", 
+                 "Feb 2016", "Mar 2016", "Apr 2016", "May 2016",
+                 "Jun 2016", "Jul 2016", "Aug 2016", "Sep 2016", 
+                 "Oct 2016", "Nov 2016")
+
+for (i in 1:2) {
+  
+  # Suppresses month names for lack of readibility.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "month:\\s+\\d+-\\d+-\\d+\\s+\\d+:\\d+:\\d+\\<br\\s+\\/\\>", 
+                "")
+  
+  # Inserts buffer sequence to be replaced at the next steps.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "\\<", 
+                "tabulationmonthnames<")
+  
+  # Inserts tabulation instruction.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "tabulation", 
+                "\\<br \\/\\>") 
+  
+  # Inserts standardized month names.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "monthnames", 
+                paste("month: ", month_names))
+  
+  # Clarifies and refines hover labels.
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "percent", 
+                    "Percentage of Tweets Sent by Device in PM")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "month", "Month")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "device", 
+                    "Device")
+  
+}
+
+# Centers the graph, because the centering 
+# opts_chunk previously inserted is not operative 
+# in the case of the ggplotly() function.
+
+htmltools::div(p, align = "center")
+
+```
+
+Most interesting: the upward tendency is even steeper for PM than for AM.
+
+At the very beginning, the proportion of the iPhone tweets is very low but it rather steadily increases towards 100 % in the last period. 
+
+As a partial conclusion, the proportion of each device in each part of the day seems to be a solid indicator. 
+
+Now, let's move to the month evolution in volume. 
+
+<br>
+
+## Weekday Breakdown
+
+```{r Graph of activity per weekday and per device}
+
+# Just below, numerous objects from the previous code chunk
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document.
+rm(graph, p)
+
+# The function Sys.setlocale() ensures that month names 
+# are in English in the graph below. 
+# The function capture.output() encapsulates the output
+# so as to avoid un message, which is then disposed of. 
+
+dustbin <- capture.output(Sys.setlocale("LC_TIME", "English"))
+rm(dustbin)
+
+# Specifies tick values for x axis.
+seq_ticks_x <- seq(1, 7, 1)
+labels_ticks_x <- c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+
+# Specifies tick values and labels for y axis.
+
+# First, calculating the percentages of tweet activity
+# per device and for each hour over the whole period. 
+
+buffer <- train %>%
+  select(device, weekday) %>%
+  mutate(weekday = factor(weekday, levels = labels_ticks_x)) %>%
+  group_by(device, weekday) %>%
+  summarize(n = n()) %>%
+  mutate(percent = round(n * 100 / sum(n), 1)) 
+
+# Second, calculating the maximum percentage and the 
+# nearest even integer that is just larger.
+
+max <- max(buffer$percent)
+even_top <- ceiling(max)
+if (even_top %% 2 > 0) {
+  even_top <- even_top + 1 
+}
+
+# Third, determining y axis ticks and labels.
+seq_ticks_y <- seq(0, even_top, 2)
+labels_y <- c(paste(seq_ticks_y, "%", sep = " "))
+
+# Graph of percentages of tweet activity per device
+# per hour over the whole period. 
+
+graph <- buffer %>%
+  ggplot(aes(weekday, percent, color = device)) +
+  geom_point(aes(size = percent)) +
+  # Specifies dot sizes.
+  scale_size_continuous(range = c(2, 6)) + 
+  
+  # Discards legend referring to dot sizes because that piece 
+  # of information would be redundant with y-axis labels. 
+  guides(size = "none") +
+  
+  # Specifies scales.
+  scale_y_continuous(breaks = seq_ticks_y, 
+                     limits = c(min(seq_ticks_y), max(seq_ticks_y)),
+                     labels = labels_y) +
+
+  # Specifies labels.
+  labs(title = "Tweet Activity per Weekday per Device over the Whole Period",
+       x = "") +
+  
+  theme(plot.title = element_text(hjust = 0.5, vjust = 3, 
+                                  size = 16, face = "bold",
+                                  color = deep_blue),
+        axis.title.x = element_text(vjust = -1, size = 16,
+                                    color = deep_blue), 
+        axis.title.y = element_blank(), 
+        legend.title = element_blank(),
+        axis.text.x = element_text(hjust = 1, size = 12,
+                                   color = deep_blue), 
+        axis.text.y = element_text(size = 12, color = deep_blue),
+        legend.text = element_text(size = 14, face = "bold",
+                                   color = deep_blue),
+        
+        # Removes the vertical grid lines.
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        
+        # Formats axis ticks.
+        axis.ticks.x = element_line(size = 14, color = deep_blue),
+        axis.ticks.y = element_blank(),
+  
+        # Colors horizontal grid lines.
+        panel.grid.major.y = element_line(color = sky_blue,
+                                          size = 2),
+        panel.grid.minor.y = element_line(color = sky_blue,
+                                          size = 2),
+        
+        # Specifies background color. 
+        panel.background = element_rect(fill = white)) +
+  
+  # Specifies device colors.
+  scale_color_manual(values = duo_Palette_bluishgreen_gray,
+                     name = NULL) 
+
+# Makes the graph interactive.
+p <- ggplotly(graph, height = 500) %>%
+       layout(legend = list(orientation = "h", x = 0.3, y = -0.1),
+              hoverlabel = list(bordercolor = white))
+
+# Refines layout of hover labels. 
+for (i in 1:2) {
+
+  # Prevents double information about percentage when hovering.
+  p$x$data[[i]]$text <- 
+    str_replace(p$x$data[[i]]$text, 
+                "\\<br\\s+\\/\\>percent:\\s+\\d+.\\d+", 
+                "")
+  
+  # Reorders labels so that percentage comes first.
+  p$x$data[[i]]$text <- str_replace(p$x$data[[i]]$text, 
+    "(weekday:\\s+[:alpha:]+)(\\<br\\s+\\/\\>device:\\s+[:alpha:]+)(\\<br\\s+\\/\\>)(percent:.+$)", 
+    "\\4\\3\\1\\2")
+  
+  # Clarifies and refines hover labels.
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "weekday", "Weekday")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "device", "Device")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "percent", 
+                    "Percentage of Tweets Sent by Device this Weekday")
+  
+} 
+
+# Centers the graph, because the centering opts_chunk 
+# previously inserted is not operative with ggplotly().
+htmltools::div(p, align = "center")
+
+```
+
+Useful insight: there is heavy imbalance on Sunday in favor of the Android device. Imbalance is less big on other weekdays. Even if it were only for Sunday, this looks like an interesting candidate predictor.
+
+<br>
+
+## Month Evolution
+
+All datetime values have been aggregated by month. This gives chronological evolution with a strong smoothing effect. This month component will be used in this section to show activity per month and per device. 
+
+Since there are more iPhone tweets than Android tweets, for comparability reasons, activity per month could be expressed as an activity percentage per device with mutate(percent = n / sum(n)) %>%.
+  
+```{r Graph of activity per month and per device}
+
+# Just below, 3 objects from the previous code chunk
+# are deleted. They are deleted here to decrease by one 
+# the number of fold buttons in the rendered HTML document.
+rm(buffer, graph, p)
+
+# The function Sys.setlocale() ensures that month names 
+# are in English in the graph below. 
+# The function capture.output() encapsulates the output
+# so as to avoid un message, which is then disposed of. 
+
+dustbin <- capture.output(Sys.setlocale("LC_TIME", "English"))
+rm(dustbin)
+
+# Specifies tick values and labels for y axis.
+
+# First, calculating the percentages of tweet activity
+# per device and for each month over the whole period. 
+
+buffer <- train %>%
+  select(device, month) %>%
+  group_by(device, month) %>%
+  summarize(n = n()) %>%
+  mutate(percent = round(n * 100 / sum(n), 1)) 
+
+# Second, calculating the maximum percentage and the 
+# nearest even integer that is just larger.
+
+max <- max(buffer$percent)
+even_top <- ceiling(max)
+
+if (even_top %% 2 > 0) {
+  even_top <- even_top + 1 
+}
+
+# Third, determining y axis ticks and labels.
+seq_ticks_y <- seq(0, even_top, 2)
+labels_y <- c(paste(seq_ticks_y, "%", sep = " "))
+
+# Graph of percentages of tweet activity per device
+# per month over the whole period. 
+
+graph <- train %>%
+  select(device, month) %>%
+  group_by(device, month) %>%
+  summarize(n = n()) %>%
+  mutate(percent = round(n * 100 / sum(n), 1)) %>%
+  ggplot(aes(month, percent, color = device)) +
+  geom_point(aes(size = percent)) +
+  scale_size_continuous(range = c(2, 6)) +         # Size of dots
+  guides(size = "none") +                          # No legend for size
+  scale_x_datetime(breaks= scales::breaks_width("2 months"),
+                   labels = label_date_short()) +
+  scale_y_continuous(breaks = seq_ticks_y, 
+                     limits = c(min(seq_ticks_y), max(seq_ticks_y)),
+                     labels = labels_y) +
+  ggtitle("Tweet Activity per Month per Device") +
+  labs(x = "",
+       y = "% of Tweets per Month",
+       color = "") +
+  theme(plot.title = element_text(hjust = 0.4, vjust = 3, 
+                                  size = 16, face = "bold",
+                                  color = deep_blue),
+        axis.title.x = element_text(vjust = -1, size = 14,
+                                    color = deep_blue), 
+        axis.title.y = element_text(vjust = 3, size = 14,
+                                    color = deep_blue), 
+        legend.title = element_text(size = 14, color = deep_blue),
+        axis.text.x = element_text(hjust = 1, vjust = 1, 
+                                   size = 12, color = deep_blue),
+        axis.text.y = element_text(size = 12, color = deep_blue),
+        legend.text = element_text(size = 16, face = "bold",
+                                   color = deep_blue),
+        
+        # Removing vertical grid
+        panel.grid.major.x = element_blank(),     
+        panel.grid.minor.x = element_blank(),
+  
+        # Colors horizontal grid lines.
+        panel.grid.major.y = element_line(size = 2, color = sky_blue),
+        panel.grid.minor.y = element_line(size = 2, color = sky_blue),     
+        
+        # Formats axis ticks.
+        axis.ticks.x = element_line(size = 8, color = sky_blue),
+        axis.ticks.y = element_blank(),
+        
+        # Colors background.
+        panel.background = element_rect(fill = white)) +
+  
+  scale_color_manual(values = duo_Palette_bluishgreen_gray)
+
+# Makes the graph interactive.
+p <- ggplotly(graph, height = 500) %>%
+       layout(legend = list(orientation = "h", x = 0.3, y = -0.2),
+              hoverlabel = list(bordercolor = white))
+
+# Simplifies hover information.
+
+month_names <- c("Jun 2015", "Jul 2015", "Aug 2015", "Sep 2015", 
+                 "Oct 2015", "Nov 2015", "Dec 2015", "Jan 2016", 
+                 "Feb 2016", "Mar 2016", "Apr 2016", "May 2016",
+                 "Jun 2016", "Jul 2016", "Aug 2016", "Sep 2016", 
+                 "Oct 2016", "Nov 2016")
+
+for (i in 1:2) {
+  
+  # Suppresses month names for lack of readibility.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, "\\s+\\d+-\\d+-\\d+", "")
+  
+  # Inserts standardized month names.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, ":", paste(": ", month_names)) 
+  
+  # Suppresses redundancies about percentage.
+  p$x$data[[i]]$text <-
+    str_replace(p$x$data[[i]]$text, 
+                "\\<br\\s+\\/\\>percent:\\s+\\d+.\\d+", 
+                "")
+  
+  # Reorders labels so that percentage comes first.
+  p$x$data[[i]]$text <- str_replace(p$x$data[[i]]$text, 
+    "(month:\\s+[:alpha:]+\\s+\\d+)(\\<br\\s+\\/\\>device:\\s+[:alpha:]+)(\\<br\\s+\\/\\>)(percent:.+$)", 
+    "\\4\\3\\1\\2")
+  
+  # Clarifies and refines hover labels.
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "month", "Month")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "device", "Device")
+  p$x$data[[i]]$text <- 
+    str_replace_all(p$x$data[[i]]$text, "percent", 
+                    "Percentage of Tweets Sent by Device this Month")
+  
+}
+
+# Centers the graph, because the centering 
+# opts_chunk previously inserted is not operative 
+# in the case of the ggplotly() function.
+
+htmltools::div(p, align = "center")
+
+rm(graph, p)
+```
+
+<br>
+
+Interpreting curve evolution would probably require additional information; it is out of the scope of this project. 
+
+General tendency is rather similar up to July 2016: first, there is an upward tendency, up to the first trimester of 2016, then activity plummets, with the exception of July 2016 for Android; for the iPhone, activity surges again from July until October 2016; decrease in November is linked to the month period being shortened.  
+
+Moreover, in levels, at the beginning of the period, the activity of the Android device is higher than the one from the iPhone, and vice versa at the end of the period. 
+
+These differences qualify month as a candidate predictor in tweet attribution, the more so since average day schedule also varies on a monthly basis. 
+
+<br>
+
+# Conclusion
+
+Conclusions can be drawn at two levels.
+
+On the one hand, as far as tweet attribution is concerned, several predictors seem promising:
+
+- indication of hour, 
+- indication of AM and PM,
+- indication of AM and PM per month,
+- indication of customized hour slots,
+- indication of weekday,
+- indication of weekday per month,
+- indication of month,
+- indication of year.
+
+On the other hand, it should be realized that all date and time predictors can make sense because the validation set is in the same period. If the validation set were not in the same period, e.g. if it were posterior to the training set, some candidate predictors might lose their usefulness because some temporal patterns might no be reproduced in the period of the validation set. Anyway, the same holds for candidate predictors originating in NLM, Text Mining or Sentiment Analysis.
+
+Activity by the two devices is intermingled in the sense that there is no clear-cut separation; the busiest hour periods differ clearly on average, but on a daily basis the busiest hour periods do not systematically differ. 
+
+So, there are partial time leads and lags between devices. Would that be compatible with the hypothesis of two separate entities each using  one device? Actually, beyond the factual statement of these leads and lags, anything else is sheer speculation on the basis of information available. Moreover, the approach in this project is not at all person-related. Whether the two devices are or are not operated by the same entity or by two different entities is not material to our purposes. 
+
+The factual statement of leads and lags is used in this EDA section to characterize tweets from the two devices. In machine learning, this piece of information can be used to attribute tweets to one particular device. 
+
+---------------------------------------------------------------------------
+
+COLORS
+
+The first two references deal with color-blind-friendly issues. 
+
+http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/
+
+https://venngage.com/blog/color-blind-friendly-palette/#2
+
+http://www.sthda.com/english/wiki/ggplot2-themes-and-background-colors-the-3-elements
+
+https://ggplot2.tidyverse.org/reference/scale_manual.html
+it's recommended to use a named vector
+
+---------------------------------------------------------------------
+
+Donald Trump and Twitter – 2009 / 2021 analysis
+
+https://www.tweetbinder.com/blog/trump-twitter/
+
+------------------------------------------------------------------
+
+Extracting the 12 hour interval as am/pm values has been done using a piece of advice of Jaap's on Stack Overflow. This is interesting. But this solution has proven unstable in my workenvironnement and I have opted out of this solution and have opted into something simpler (see above).
+
+https://stackoverflow.com/questions/37896824/grouping-time-and-counting-instances-by-12-hour-bins-in-r
+
+Since you are using fixed strings, not regular expressions, you need to tell the regex engine to use the patterns as plain, literal text. With fixed().
+
+----------------------------------------------------------------------
+
+GGPLOT2 IN GENERAL 
+
+http://www.sthda.com/english/wiki/ggplot2-essentials
+
+----------------------------------------------------------------------
+
+GGPLOT2 datetime scales with breaks_width() and breaks_pretty() 
+
+https://bookdown.org/Maxine/ggplot2-maps/posts/2019-11-27-using-scales-package-to-modify-ggplot2-scale/
+
+https://scales.r-lib.org/reference/breaks_pretty.html
+
+----------------------------------------------------------------------
+
+TICKS ON A DISCRETE NUMERIC X AXIS
+
+https://stackoverflow.com/questions/47794265/changing-x-axis-ticks-in-ggplot2
+
+ID is a numeric column, so ggplot2 uses a continuous scale, not a discrete scale:
+
+----------------------------------------------------------------------
+
+GGPLOT2 SUBTITLES
+
+hrbrmstr
+https://stackoverflow.com/questions/11724311/how-to-add-a-ggplot2-subtitle-with-different-size-and-colour
+
+----------------------------------------------------------------------
+
+GGPLOT2 SIZE OF DOT SYMBOLS
+ialm
+
+https://stackoverflow.com/questions/20251119/increase-the-size-of-variable-size-points-in-ggplot2-scatter-plot
+
+----------------------------------------------------------------------
+
+GGPLOT2 SUPPRESSING LEGEND RELATED TO geom_point(aes(size = n))
+Brandon Bertelsen
+https://stackoverflow.com/questions/4207518/how-can-i-hide-the-part-of-the-legend-using-ggplot2
+
+Actually didn't work because size grading disappeated with legend.
+
+But
+Didzis Elferts
+https://stackoverflow.com/questions/14604435/turning-off-some-legends-in-a-ggplot
+
+https://ggplot2.tidyverse.org/reference/scale_manual.html
+it's recommended to use a named vector
+----------------------------------------------------------------------
+
+GGPLOT2 adding border.panel without losing everything inside
+
+https://stackoverflow.com/questions/26191833/add-panel-border-to-ggplot2
+
+----------------------------------------------------------------------
+
+https://stackoverflow.com/questions/12977073/how-to-find-the-difference-between-two-dates-in-hours-in-r
+How to find the difference between two dates in hours in R?
+Thank you Andrie
+
+----------------------------------------------------------------------
+
+PLOTLY with GGPLOT2
+
+https://stackoverflow.com/questions/45801389/disable-hover-information-for-a-specific-layer-geom-of-plotly
+
+Example of modifying hover information
+
+----------------------------------------------------------------------
+
+PLOTLY with GGPLOT2
+
+https://stackoverflow.com/questions/54695153/fix-plotly-legend-position-and-disable-plotly-panel-for-shiny-in-rmarkdown
+
+Fixing plotly legend position at the bottom
+
+----------------------------------------------------------------------
+
+KNITR::KABLE()
+
+https://stackoverflow.com/questions/51418946/how-to-align-column-title-and-content-in-knitr
+
+----------------------------------------------------------------------
+
+UNDERSTAND YOUR DATA SET WITH XGBOOST
+
+https://cran.r-project.org/web/packages/xgboost/vignettes/discoverYourData.html#feature-importance
+
+----------------------------------------------------------------------
+
+
+
+
+
+
+
